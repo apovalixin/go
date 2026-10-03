@@ -5083,10 +5083,10 @@ func instructionsForProg(p *obj.Prog, compress bool) []*instruction {
 		for _, ins := range inss {
 			rv32Legalize(p.Ctxt, p, ins)
 		}
-		// The compressed encodings differ between RV32 and RV64
-		// (C.JAL, C.FLW and C.FSW take the place of C.ADDIW, C.LD and
-		// C.SD), so RV32 code is not compressed yet.
-		compress = false
+		// The compressed encodings that differ between RV32 and RV64
+		// (C.ADDIW, C.LD, C.SD and their stack-pointer forms) belong
+		// to instructions that rv32Legalize has just replaced, so the
+		// remaining ones compress the same way on both.
 	}
 
 	// Only compress instructions when there is no relocation, since

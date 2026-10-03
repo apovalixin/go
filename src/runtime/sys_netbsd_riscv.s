@@ -54,6 +54,10 @@
 	MOV	$n, T6;	\
 	ECALL
 #define NOP4	WORD	$0x00000013
+// The instructions in the two slots are spelled as words so that the
+// assembler cannot pick a two-byte encoding for them.
+#define NEG_A0	WORD	$0x40a00533	// sub a0, zero, a0
+#define LI_A0_M1	WORD	$0xfff00513	// addi a0, zero, -1
 #define CRASH	WORD	$0	// illegal instruction
 
 // func lwp_create(ctxt unsafe.Pointer, flags, lwpid uintptr) int32
@@ -62,7 +66,7 @@ TEXT runtime·lwp_create(SB),NOSPLIT,$0-16
 	MOV	flags+4(FP), A1
 	MOV	lwpid+8(FP), A2
 	SYSCALL(SYS__lwp_create)
-	NEG	A0, A0
+	NEG_A0
 	NOP4
 	MOVW	A0, ret+12(FP)
 	RET
@@ -144,7 +148,7 @@ TEXT runtime·open(SB),NOSPLIT,$0-16
 	MOVW	mode+4(FP), A1
 	MOVW	perm+8(FP), A2
 	SYSCALL(SYS_open)
-	MOV	$-1, A0
+	LI_A0_M1
 	NOP4
 	MOVW	A0, ret+12(FP)
 	RET
@@ -153,7 +157,7 @@ TEXT runtime·open(SB),NOSPLIT,$0-16
 TEXT runtime·closefd(SB),NOSPLIT,$0-8
 	MOVW	fd+0(FP), A0
 	SYSCALL(SYS_close)
-	MOV	$-1, A0
+	LI_A0_M1
 	NOP4
 	MOVW	A0, ret+4(FP)
 	RET
@@ -164,7 +168,7 @@ TEXT runtime·read(SB),NOSPLIT,$0-16
 	MOV	p+4(FP), A1
 	MOVW	n+8(FP), A2
 	SYSCALL(SYS_read)
-	NEG	A0, A0
+	NEG_A0
 	NOP4
 	MOVW	A0, ret+12(FP)
 	RET
@@ -174,7 +178,7 @@ TEXT runtime·pipe2(SB),NOSPLIT,$0-16
 	MOV	$r+4(FP), A0
 	MOVW	flags+0(FP), A1
 	SYSCALL(SYS_pipe2)
-	NEG	A0, A0
+	NEG_A0
 	NOP4
 	MOVW	A0, errno+12(FP)
 	RET
@@ -185,7 +189,7 @@ TEXT runtime·write1(SB),NOSPLIT,$0-16
 	MOV	p+4(FP), A1
 	MOVW	n+8(FP), A2
 	SYSCALL(SYS_write)
-	NEG	A0, A0
+	NEG_A0
 	NOP4
 	MOVW	A0, ret+12(FP)
 	RET
@@ -371,7 +375,7 @@ TEXT runtime·madvise(SB),NOSPLIT,$0-16
 	MOV	n+4(FP), A1
 	MOVW	flags+8(FP), A2
 	SYSCALL(SYS_madvise)
-	MOV	$-1, A0
+	LI_A0_M1
 	NOP4
 	MOVW	A0, ret+12(FP)
 	RET
@@ -394,7 +398,7 @@ TEXT runtime·sysctl(SB),NOSPLIT,$0-28
 	MOV	dst+16(FP), A4
 	MOV	ndst+20(FP), A5
 	SYSCALL(SYS___sysctl)
-	NEG	A0, A0
+	NEG_A0
 	NOP4
 	MOVW	A0, ret+24(FP)
 	RET
@@ -402,7 +406,7 @@ TEXT runtime·sysctl(SB),NOSPLIT,$0-28
 // func kqueue() int32
 TEXT runtime·kqueue(SB),NOSPLIT,$0-4
 	SYSCALL(SYS_kqueue)
-	NEG	A0, A0
+	NEG_A0
 	NOP4
 	MOVW	A0, ret+0(FP)
 	RET
@@ -416,7 +420,7 @@ TEXT runtime·kevent(SB),NOSPLIT,$0-28
 	MOVW	nev+16(FP), A4
 	MOV	ts+20(FP), A5
 	SYSCALL(SYS___kevent50)
-	NEG	A0, A0
+	NEG_A0
 	NOP4
 	MOVW	A0, ret+24(FP)
 	RET
