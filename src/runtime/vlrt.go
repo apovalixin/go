@@ -229,8 +229,8 @@ func dodiv(n, d uint64) (q, r uint64) {
 		return slowdodiv(n, d)
 	}
 
-	if GOARCH == "mips" || GOARCH == "mipsle" {
-		// No _div64by32 on mips and using only _mul64by32 doesn't bring much benefit
+	if GOARCH == "mips" || GOARCH == "mipsle" || GOARCH == "riscv" {
+		// No _div64by32 on mips or riscv and using only _mul64by32 doesn't bring much benefit
 		return slowdodiv(n, d)
 	}
 
