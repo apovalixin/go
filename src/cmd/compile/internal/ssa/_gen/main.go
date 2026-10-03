@@ -218,6 +218,7 @@ func main() {
 			genRules(a)
 			genSplitLoadRules(a)
 			genLateLowerRules(a)
+			genRV32Rules(a)
 		})
 	}
 	var wg sync.WaitGroup

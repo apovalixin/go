@@ -358,6 +358,18 @@ func NewConfig(arch string, types Types, ctxt *obj.Link, optimize, softfloat boo
 		c.floatParamRegs = paramFloatRegRISCV64
 		c.FPReg = framepointerRegRISCV64
 		c.hasGReg = true
+	case "riscv":
+		// 32-bit RISC-V shares the registers and the op table of
+		// riscv64; only the lowering rules differ.
+		c.PtrSize = 4
+		c.RegSize = 4
+		c.lowerBlock = rewriteBlockRISCV64rv32
+		c.lowerValue = rewriteValueRISCV64rv32
+		c.registers = registersRISCV64[:]
+		c.gpRegMask = gpRegMaskRISCV64
+		c.fpRegMask = fpRegMaskRISCV64
+		c.FPReg = framepointerRegRISCV64
+		c.hasGReg = true
 	case "wasm":
 		c.PtrSize = 8
 		c.RegSize = 8

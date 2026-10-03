@@ -37,6 +37,7 @@ var archInits = map[string]func(*ssagen.ArchInfo){
 	"mips64le": mips64.Init,
 	"ppc64":    ppc64.Init,
 	"ppc64le":  ppc64.Init,
+	"riscv":    riscv64.InitRV32,
 	"riscv64":  riscv64.Init,
 	"s390x":    s390x.Init,
 	"wasm":     wasm.Init,

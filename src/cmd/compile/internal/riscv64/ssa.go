@@ -170,7 +170,7 @@ func storeByType(t *types.Type) obj.As {
 // This matches the calculation in ssa.moveSize.
 func largestMove(alignment int64) (obj.As, int64) {
 	switch {
-	case alignment%8 == 0:
+	case alignment%8 == 0 && base.Ctxt.Arch.RegSize == 8:
 		return riscv.AMOV, 8
 	case alignment%4 == 0:
 		return riscv.AMOVW, 4

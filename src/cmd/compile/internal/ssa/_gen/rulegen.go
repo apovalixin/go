@@ -92,6 +92,7 @@ func (r Rule) parse() (match, cond, result string) {
 func genRules(arch arch)          { genRulesSuffix(arch, "") }
 func genSplitLoadRules(arch arch) { genRulesSuffix(arch, "splitload") }
 func genLateLowerRules(arch arch) { genRulesSuffix(arch, "latelower") }
+func genRV32Rules(arch arch)      { genRulesSuffix(arch, "rv32") }
 
 func genRulesSuffix(arch arch, suff string) {
 	var readers []NamedReader
