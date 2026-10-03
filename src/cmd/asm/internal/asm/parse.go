@@ -218,7 +218,7 @@ next:
 		for {
 			tok = p.nextToken()
 			if len(operands) == 0 && len(items) == 0 {
-				if p.arch.InFamily(sys.ARM, sys.ARM64, sys.AMD64, sys.I386, sys.Loong64, sys.RISCV64) && tok == '.' {
+				if p.arch.InFamily(sys.ARM, sys.ARM64, sys.AMD64, sys.I386, sys.Loong64, sys.RISCV, sys.RISCV64) && tok == '.' {
 					// Suffixes: ARM conditionals, Loong64 vector instructions, RISCV rounding mode or x86 modifiers.
 					tok = p.nextToken()
 					str := p.lex.Text()
@@ -406,7 +406,7 @@ func (p *Parser) operand(a *obj.Addr) {
 				a.Type = obj.TYPE_SPECIAL
 				a.Offset = int64(opd)
 			}
-		case sys.RISCV64:
+		case sys.RISCV, sys.RISCV64:
 			if opd := arch.RISCV64SpecialOperand(name); opd != riscv.SPOP_END {
 				a.Type = obj.TYPE_SPECIAL
 				a.Offset = int64(opd)

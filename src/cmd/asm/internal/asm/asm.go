@@ -48,7 +48,7 @@ func (p *Parser) append(prog *obj.Prog, cond string, doLabel bool) {
 				p.errorf("%v", err)
 				return
 			}
-		case sys.RISCV64:
+		case sys.RISCV, sys.RISCV64:
 			if err := riscv.ParseSuffix(prog, cond); err != nil {
 				p.errorf("unrecognized suffix .%q", cond)
 				return
@@ -467,7 +467,7 @@ func (p *Parser) asmJump(op obj.As, cond string, a []obj.Addr) {
 			}
 			break
 		}
-		if p.arch.Family == sys.MIPS || p.arch.Family == sys.MIPS64 || p.arch.Family == sys.RISCV64 {
+		if p.arch.Family == sys.MIPS || p.arch.Family == sys.MIPS64 || p.arch.InFamily(sys.RISCV, sys.RISCV64) {
 			// 3-operand jumps.
 			// First two must be registers
 			target = &a[2]
@@ -665,7 +665,7 @@ func (p *Parser) asmInstruction(op obj.As, cond string, a []obj.Addr) {
 				prog.AddRestSource(a[1])
 				break
 			}
-		} else if p.arch.Family == sys.RISCV64 {
+		} else if p.arch.InFamily(sys.RISCV, sys.RISCV64) {
 			// RISCV64 pseudo instructions that reference CSRs with symbolic names.
 			if isImm, specialIndex, ok := arch.IsRISCV64PseudoCSRO(op); ok {
 				if a[0].Type != obj.TYPE_CONST && isImm {
@@ -799,7 +799,7 @@ func (p *Parser) asmInstruction(op obj.As, cond string, a []obj.Addr) {
 			default:
 				prog.AddRestSource(a[1])
 			}
-		case sys.RISCV64:
+		case sys.RISCV, sys.RISCV64:
 			// RISCV64 instructions with one input and two outputs.
 			if arch.IsRISCV64AMO(op) {
 				prog.From = a[0]
@@ -906,7 +906,7 @@ func (p *Parser) asmInstruction(op obj.As, cond string, a []obj.Addr) {
 			}
 			break
 		}
-		if p.arch.Family == sys.RISCV64 {
+		if p.arch.InFamily(sys.RISCV, sys.RISCV64) {
 			prog.From = a[0]
 			prog.Reg = p.getRegister(prog, op, &a[1])
 			prog.AddRestSource(a[2])
@@ -991,7 +991,7 @@ func (p *Parser) asmInstruction(op obj.As, cond string, a []obj.Addr) {
 			prog.To = a[5]
 			break
 		}
-		if p.arch.Family == sys.RISCV64 && arch.IsRISCV64VTypeI(op) {
+		if p.arch.InFamily(sys.RISCV, sys.RISCV64) && arch.IsRISCV64VTypeI(op) {
 			prog.From = a[0]
 			vsew := p.getSpecial(prog, op, &a[1])
 			vlmul := p.getSpecial(prog, op, &a[2])

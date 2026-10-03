@@ -75,6 +75,10 @@ func Set(GOARCH string, shared bool) *Arch {
 		return archPPC64(&ppc64.Linkppc64)
 	case "ppc64le":
 		return archPPC64(&ppc64.Linkppc64le)
+	case "riscv":
+		a := archRISCV64(shared)
+		a.LinkArch = &riscv.LinkRISCV
+		return a
 	case "riscv64":
 		return archRISCV64(shared)
 	case "s390x":

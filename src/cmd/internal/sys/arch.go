@@ -21,6 +21,7 @@ const (
 	MIPS    = goarch.MIPS
 	MIPS64  = goarch.MIPS64
 	PPC64   = goarch.PPC64
+	RISCV   = goarch.RISCV
 	RISCV64 = goarch.RISCV64
 	S390X   = goarch.S390X
 	Wasm    = goarch.WASM
@@ -230,6 +231,19 @@ var ArchPPC64LE = &Arch{
 	FixedFrameSize: 4 * 8,
 }
 
+var ArchRISCV = &Arch{
+	Name:           "riscv",
+	Family:         RISCV,
+	ByteOrder:      binary.LittleEndian,
+	PtrSize:        4,
+	RegSize:        4,
+	MinLC:          2,
+	Alignment:      4, // riscv unaligned loads work, but are really slow (trap + simulated by OS)
+	CanMergeLoads:  false,
+	HasLR:          true,
+	FixedFrameSize: 4, // LR
+}
+
 var ArchRISCV64 = &Arch{
 	Name:           "riscv64",
 	Family:         RISCV64,
@@ -281,6 +295,7 @@ var Archs = [...]*Arch{
 	ArchMIPS64LE,
 	ArchPPC64,
 	ArchPPC64LE,
+	ArchRISCV,
 	ArchRISCV64,
 	ArchS390X,
 	ArchWasm,

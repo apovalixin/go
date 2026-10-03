@@ -34,7 +34,57 @@ import (
 	"strings"
 )
 
-func buildop(ctxt *obj.Link) {}
+// rv32 reports whether the target is 32-bit RISC-V (GOARCH=riscv). The
+// assembler builds every instruction sequence as it would for RV64 and
+// then rewrites it for RV32 in rv32Legalize.
+var rv32 bool
+
+func buildop(ctxt *obj.Link) {
+	rv32 = ctxt.Arch.PtrSize == 4
+}
+
+// rv32Subst maps RV64 instructions onto the RV32 instruction that does the
+// same thing with 32-bit registers. The W forms operate on the low 32 bits,
+// which is the whole register on RV32.
+var rv32Subst = map[obj.As]obj.As{
+	ALD:    ALW,
+	ASD:    ASW,
+	ALWU:   ALW,
+	AADDIW: AADDI,
+	ASLLIW: ASLLI,
+	ASRLIW: ASRLI,
+	ASRAIW: ASRAI,
+	AADDW:  AADD,
+	ASUBW:  ASUB,
+	ASLLW:  ASLL,
+	ASRLW:  ASRL,
+	ASRAW:  ASRA,
+	AMULW:  AMUL,
+	ADIVW:  ADIV,
+	ADIVUW: ADIVU,
+	AREMW:  AREM,
+	AREMUW: AREMU,
+	ALRD:   ALRW,
+	ASCD:   ASCW,
+}
+
+// rv32Legalize rewrites an instruction built for RV64 into its RV32 form,
+// and rejects the ones that have none.
+func rv32Legalize(ctxt *obj.Link, p *obj.Prog, ins *instruction) {
+	if as, ok := rv32Subst[ins.as]; ok {
+		ins.as = as
+	}
+	switch ins.as {
+	case ASLLI, ASRLI, ASRAI:
+		if ins.imm < 0 || ins.imm > 31 {
+			ctxt.Diag("%v: shift amount %d out of range for RV32", p, ins.imm)
+		}
+	case AFCVTLS, AFCVTLUS, AFCVTSL, AFCVTSLU, AFCVTLD, AFCVTLUD, AFCVTDL, AFCVTDLU,
+		AFMVXD, AFMVDX, AADDUW, AAMOSWAPD, AAMOADDD, AAMOANDD, AAMOORD, AAMOXORD,
+		AAMOMAXD, AAMOMAXUD, AAMOMIND, AAMOMINUD:
+		ctxt.Diag("%v: instruction %v is not available on RV32", p, ins.as)
+	}
+}
 
 func jalToSym(ctxt *obj.Link, p *obj.Prog, lr int16) {
 	switch p.As {
@@ -461,7 +511,11 @@ func stackOffset(a *obj.Addr, stacksize int64) {
 		a.Offset += stacksize
 	case obj.NAME_PARAM:
 		// Adjust to the bottom of PARAMs.
-		a.Offset += stacksize + 8
+		if rv32 {
+			a.Offset += stacksize + 4
+		} else {
+			a.Offset += stacksize + 8
+		}
 	}
 }
 
@@ -486,7 +540,7 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 	}
 
 	stacksize := text.To.Offset
-	if stacksize == -8 {
+	if stacksize == -8 || rv32 && stacksize == -4 {
 		// Historical way to mark NOFRAME.
 		text.From.Sym.Set(obj.AttrNoFrame, true)
 		stacksize = 0
@@ -3759,6 +3813,10 @@ func instructionsForOpImmediate(p *obj.Prog, as obj.As, rs int16) []*instruction
 	ins := instructionForProg(p)
 	ins.as, ins.rs1, ins.rs2 = as, uint32(rs), obj.REG_NONE
 
+	if rv32 && int64(uint32(ins.imm)) == ins.imm {
+		ins.imm = int64(int32(ins.imm))
+	}
+
 	low, high, err := Split32BitImmediate(ins.imm)
 	if err != nil {
 		p.Ctxt.Diag("%v: constant %d too large: %v", p, ins.imm, err)
@@ -3958,6 +4016,15 @@ func instructionsForMOVConst(p *obj.Prog) []*instruction {
 	//     SLLI $13, X10
 	//     SRLI $12, X10
 	//
+	if rv32 {
+		// A register holds 32 bits, so a constant is its low word.
+		if int64(uint32(ins.imm)) != ins.imm && int64(int32(ins.imm)) != ins.imm {
+			p.Ctxt.Diag("%v: constant %d does not fit in 32 bits", p, ins.imm)
+			return nil
+		}
+		ins.imm = int64(int32(ins.imm))
+	}
+
 	var insSLLI, insSRLI, insMOVWU *instruction
 	if err := immIFits(ins.imm, 32); err != nil {
 		if c, lsh, rsh, ok := splitShiftConst(ins.imm); ok {
@@ -4041,6 +4108,34 @@ func instructionsForMOV(p *obj.Prog) []*instruction {
 		case AMOVW:
 			// MOVW Ra, Rb -> ADDIW $0, Ra, Rb
 			ins.as, ins.rs1, ins.rs2, ins.imm = AADDIW, uint32(p.From.Reg), obj.REG_NONE, 0
+		case AMOVWU:
+			if rv32 {
+				// A word is the whole register: MOVWU Ra, Rb -> ADDI $0, Ra, Rb
+				ins.as, ins.rs1, ins.rs2, ins.imm = AADDI, uint32(p.From.Reg), obj.REG_NONE, 0
+				break
+			}
+			fallthrough
+		case AMOVHU:
+			if buildcfg.GORISCV64 >= 22 && !rv32 {
+				// Use ZEXTH or ADDUW to extend.
+				ins.as, ins.rs1, ins.rs2, ins.imm = AZEXTH, uint32(p.From.Reg), obj.REG_NONE, 0
+				if p.As == AMOVWU {
+					ins.as, ins.rs2 = AADDUW, REG_ZERO
+				}
+			} else {
+				// Use SLLI/SRLI sequence to extend.
+				ins.as, ins.rs1, ins.rs2 = ASLLI, uint32(p.From.Reg), obj.REG_NONE
+				if p.As == AMOVHU {
+					ins.imm = 48
+				} else if p.As == AMOVWU {
+					ins.imm = 32
+				}
+				if rv32 {
+					ins.imm -= 32
+				}
+				ins2 := &instruction{as: ASRLI, rd: ins.rd, rs1: ins.rd, imm: ins.imm}
+				inss = append(inss, ins2)
+			}
 		case AMOVBU:
 			// MOVBU Ra, Rb -> ANDI $255, Ra, Rb
 			ins.as, ins.rs1, ins.rs2, ins.imm = AANDI, uint32(p.From.Reg), obj.REG_NONE, 255
@@ -4067,7 +4162,7 @@ func instructionsForMOV(p *obj.Prog) []*instruction {
 				ins.as, ins.rs1 = AFSGNJD, uint32(p.From.Reg)
 			}
 		case AMOVB, AMOVH:
-			if buildcfg.GORISCV64 >= 22 {
+			if buildcfg.GORISCV64 >= 22 && !rv32 {
 				// Use SEXTB or SEXTH to extend.
 				ins.as, ins.rs1, ins.rs2 = ASEXTB, uint32(p.From.Reg), obj.REG_NONE
 				if p.As == AMOVH {
@@ -4081,25 +4176,10 @@ func instructionsForMOV(p *obj.Prog) []*instruction {
 				} else if p.As == AMOVH {
 					ins.imm = 48
 				}
+				if rv32 {
+					ins.imm -= 32
+				}
 				ins2 := &instruction{as: ASRAI, rd: ins.rd, rs1: ins.rd, imm: ins.imm}
-				inss = append(inss, ins2)
-			}
-		case AMOVHU, AMOVWU:
-			if buildcfg.GORISCV64 >= 22 {
-				// Use ZEXTH or ADDUW to extend.
-				ins.as, ins.rs1, ins.rs2, ins.imm = AZEXTH, uint32(p.From.Reg), obj.REG_NONE, 0
-				if p.As == AMOVWU {
-					ins.as, ins.rs2 = AADDUW, REG_ZERO
-				}
-			} else {
-				// Use SLLI/SRLI sequence to extend.
-				ins.as, ins.rs1, ins.rs2 = ASLLI, uint32(p.From.Reg), obj.REG_NONE
-				if p.As == AMOVHU {
-					ins.imm = 48
-				} else if p.As == AMOVWU {
-					ins.imm = 32
-				}
-				ins2 := &instruction{as: ASRLI, rd: ins.rd, rs1: ins.rd, imm: ins.imm}
 				inss = append(inss, ins2)
 			}
 		}
@@ -4999,6 +5079,16 @@ func instructionsForProg(p *obj.Prog, compress bool) []*instruction {
 		ins.rs1, ins.rs2 = obj.REG_NONE, REG_V0
 	}
 
+	if rv32 {
+		for _, ins := range inss {
+			rv32Legalize(p.Ctxt, p, ins)
+		}
+		// The compressed encodings differ between RV32 and RV64
+		// (C.JAL, C.FLW and C.FSW take the place of C.ADDIW, C.LD and
+		// C.SD), so RV32 code is not compressed yet.
+		compress = false
+	}
+
 	// Only compress instructions when there is no relocation, since
 	// relocation relies on knowledge about the exact instructions that
 	// are in use.
@@ -5147,6 +5237,16 @@ func ParseSuffix(prog *obj.Prog, cond string) (err error) {
 		}
 	}
 	return
+}
+
+var LinkRISCV = obj.LinkArch{
+	Arch:           sys.ArchRISCV,
+	Init:           buildop,
+	Preprocess:     preprocess,
+	Assemble:       assemble,
+	Progedit:       progedit,
+	UnaryDst:       unaryDst,
+	DWARFRegisters: RISCV64DWARFRegisters,
 }
 
 var LinkRISCV64 = obj.LinkArch{
