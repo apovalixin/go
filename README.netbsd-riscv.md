@@ -16,13 +16,12 @@ Working there:
   goroutines with the garbage collector, asynchronous preemption,
   recovery from a nil dereference and TCP over loopback runs correctly.
 - An HTTPS client and server in one process complete a TLS 1.3 exchange.
+- Code is compressed (RV32C) the same way as on riscv64.
 
 Not done or not tested:
 
 - More than one CPU.
 - cgo and external linking. Only static, internally linked binaries.
-- Compressed instructions: RV32 code is not compressed, so binaries are
-  larger than they need to be.
 - Hardware floating point: all floating point is soft.
 - Compiler intrinsics for atomics and bit operations: they are ordinary
   function calls.
