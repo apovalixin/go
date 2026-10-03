@@ -49,7 +49,7 @@ func riscv64RegName(r int) string {
 
 func init() {
 	var regNamesRISCV64 []string
-	var gpMask, fpMask, gpgMask, gpspMask, gpspsbMask, gpspsbgMask, first16Mask regMask
+	var gpMask, fpMask, gpgMask, gpspMask, gpspsbMask, gpspsbgMask, first16Mask, first4Mask regMask
 	regNamed := make(map[string]regMask)
 
 	// Build the list of register names, creating an appropriately indexed
@@ -95,6 +95,9 @@ func init() {
 			gpspsbgMask = gpspsbgMask.union(mask)
 			if r >= 5 && r < 5+16 {
 				first16Mask = first16Mask.union(mask)
+			}
+			if r >= 5 && r < 5+4 {
+				first4Mask = first4Mask.union(mask)
 			}
 		}
 	}
@@ -459,6 +462,10 @@ func init() {
 		{name: "LoweredPanicBoundsRC", argLength: 2, aux: "PanicBoundsC", reg: regInfo{inputs: []regMask{first16Mask}}, typ: "Mem", call: true},       // arg0=x, arg1=mem, returns memory.
 		{name: "LoweredPanicBoundsCR", argLength: 2, aux: "PanicBoundsC", reg: regInfo{inputs: []regMask{first16Mask}}, typ: "Mem", call: true},       // arg0=y, arg1=mem, returns memory.
 		{name: "LoweredPanicBoundsCC", argLength: 1, aux: "PanicBoundsCC", reg: regInfo{}, typ: "Mem", call: true},                                    // arg0=mem, returns memory.
+
+		// Same as above, but the x value is 64 bits wide on a 32-bit target (GOARCH=riscv).
+		{name: "LoweredPanicExtendRR", argLength: 4, aux: "Int64", reg: regInfo{inputs: []regMask{first4Mask, first4Mask, first16Mask}}, typ: "Mem", call: true}, // arg0=x_hi, arg1=x_lo, arg2=y, arg3=mem, returns memory.
+		{name: "LoweredPanicExtendRC", argLength: 3, aux: "PanicBoundsC", reg: regInfo{inputs: []regMask{first4Mask, first4Mask}}, typ: "Mem", call: true},       // arg0=x_hi, arg1=x_lo, arg2=mem, returns memory.
 
 		// F extension.
 		{name: "FADDS", argLength: 2, reg: fp21, asm: "FADDS", commutative: true, typ: "Float32", earlyOk: true},                                                // arg0 + arg1

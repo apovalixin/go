@@ -234,6 +234,9 @@ func rewriteValueRISCV64rv32(v *Value) bool {
 	case OpPanicBounds:
 		v.Op = OpRISCV64LoweredPanicBoundsRR
 		return true
+	case OpPanicExtend:
+		v.Op = OpRISCV64LoweredPanicExtendRR
+		return true
 	case OpPubBarrier:
 		v.Op = OpRISCV64LoweredPubBarrier
 		return true
@@ -251,6 +254,10 @@ func rewriteValueRISCV64rv32(v *Value) bool {
 		return rewriteValueRISCV64rv32_OpRISCV64LoweredPanicBoundsRC(v)
 	case OpRISCV64LoweredPanicBoundsRR:
 		return rewriteValueRISCV64rv32_OpRISCV64LoweredPanicBoundsRR(v)
+	case OpRISCV64LoweredPanicExtendRC:
+		return rewriteValueRISCV64rv32_OpRISCV64LoweredPanicExtendRC(v)
+	case OpRISCV64LoweredPanicExtendRR:
+		return rewriteValueRISCV64rv32_OpRISCV64LoweredPanicExtendRR(v)
 	case OpRISCV64MOVBUload:
 		return rewriteValueRISCV64rv32_OpRISCV64MOVBUload(v)
 	case OpRISCV64MOVBUreg:
@@ -1106,6 +1113,19 @@ func rewriteValueRISCV64rv32_OpLsh16x32(v *Value) bool {
 		v.AddArg2(v0, v1)
 		return true
 	}
+	// match: (Lsh16x32 x y)
+	// cond: shiftIsBounded(v)
+	// result: (SLL x y)
+	for {
+		x := v_0
+		y := v_1
+		if !(shiftIsBounded(v)) {
+			break
+		}
+		v.reset(OpRISCV64SLL)
+		v.AddArg2(x, y)
+		return true
+	}
 	return false
 }
 func rewriteValueRISCV64rv32_OpLsh16x64(v *Value) bool {
@@ -1173,6 +1193,19 @@ func rewriteValueRISCV64rv32_OpLsh16x8(v *Value) bool {
 		v.AddArg2(v0, v1)
 		return true
 	}
+	// match: (Lsh16x8 x y)
+	// cond: shiftIsBounded(v)
+	// result: (SLL x y)
+	for {
+		x := v_0
+		y := v_1
+		if !(shiftIsBounded(v)) {
+			break
+		}
+		v.reset(OpRISCV64SLL)
+		v.AddArg2(x, y)
+		return true
+	}
 	return false
 }
 func rewriteValueRISCV64rv32_OpLsh32x16(v *Value) bool {
@@ -1201,6 +1234,19 @@ func rewriteValueRISCV64rv32_OpLsh32x16(v *Value) bool {
 		v2.AddArg(v3)
 		v1.AddArg(v2)
 		v.AddArg2(v0, v1)
+		return true
+	}
+	// match: (Lsh32x16 x y)
+	// cond: shiftIsBounded(v)
+	// result: (SLL x y)
+	for {
+		x := v_0
+		y := v_1
+		if !(shiftIsBounded(v)) {
+			break
+		}
+		v.reset(OpRISCV64SLL)
+		v.AddArg2(x, y)
 		return true
 	}
 	return false
@@ -1310,6 +1356,19 @@ func rewriteValueRISCV64rv32_OpLsh32x8(v *Value) bool {
 		v.AddArg2(v0, v1)
 		return true
 	}
+	// match: (Lsh32x8 x y)
+	// cond: shiftIsBounded(v)
+	// result: (SLL x y)
+	for {
+		x := v_0
+		y := v_1
+		if !(shiftIsBounded(v)) {
+			break
+		}
+		v.reset(OpRISCV64SLL)
+		v.AddArg2(x, y)
+		return true
+	}
 	return false
 }
 func rewriteValueRISCV64rv32_OpLsh8x16(v *Value) bool {
@@ -1340,6 +1399,19 @@ func rewriteValueRISCV64rv32_OpLsh8x16(v *Value) bool {
 		v.AddArg2(v0, v1)
 		return true
 	}
+	// match: (Lsh8x16 x y)
+	// cond: shiftIsBounded(v)
+	// result: (SLL x y)
+	for {
+		x := v_0
+		y := v_1
+		if !(shiftIsBounded(v)) {
+			break
+		}
+		v.reset(OpRISCV64SLL)
+		v.AddArg2(x, y)
+		return true
+	}
 	return false
 }
 func rewriteValueRISCV64rv32_OpLsh8x32(v *Value) bool {
@@ -1365,6 +1437,19 @@ func rewriteValueRISCV64rv32_OpLsh8x32(v *Value) bool {
 		v2.AddArg(y)
 		v1.AddArg(v2)
 		v.AddArg2(v0, v1)
+		return true
+	}
+	// match: (Lsh8x32 x y)
+	// cond: shiftIsBounded(v)
+	// result: (SLL x y)
+	for {
+		x := v_0
+		y := v_1
+		if !(shiftIsBounded(v)) {
+			break
+		}
+		v.reset(OpRISCV64SLL)
+		v.AddArg2(x, y)
 		return true
 	}
 	return false
@@ -2152,6 +2237,76 @@ func rewriteValueRISCV64rv32_OpRISCV64LoweredPanicBoundsRR(v *Value) bool {
 		v.reset(OpRISCV64LoweredPanicBoundsCR)
 		v.AuxInt = int64ToAuxInt(kind)
 		v.Aux = panicBoundsCToAux(PanicBoundsC{C: c})
+		v.AddArg2(y, mem)
+		return true
+	}
+	return false
+}
+func rewriteValueRISCV64rv32_OpRISCV64LoweredPanicExtendRC(v *Value) bool {
+	v_2 := v.Args[2]
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (LoweredPanicExtendRC [kind] {p} (MOVDconst [hi]) (MOVDconst [lo]) mem)
+	// result: (LoweredPanicBoundsCC [kind] {PanicBoundsCC{Cx:hi<<32 + int64(uint32(lo)), Cy:p.C}} mem)
+	for {
+		kind := auxIntToInt64(v.AuxInt)
+		p := auxToPanicBoundsC(v.Aux)
+		if v_0.Op != OpRISCV64MOVDconst {
+			break
+		}
+		hi := auxIntToInt64(v_0.AuxInt)
+		if v_1.Op != OpRISCV64MOVDconst {
+			break
+		}
+		lo := auxIntToInt64(v_1.AuxInt)
+		mem := v_2
+		v.reset(OpRISCV64LoweredPanicBoundsCC)
+		v.AuxInt = int64ToAuxInt(kind)
+		v.Aux = panicBoundsCCToAux(PanicBoundsCC{Cx: hi<<32 + int64(uint32(lo)), Cy: p.C})
+		v.AddArg(mem)
+		return true
+	}
+	return false
+}
+func rewriteValueRISCV64rv32_OpRISCV64LoweredPanicExtendRR(v *Value) bool {
+	v_3 := v.Args[3]
+	v_2 := v.Args[2]
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (LoweredPanicExtendRR [kind] hi lo (MOVDconst [c]) mem)
+	// result: (LoweredPanicExtendRC [kind] hi lo {PanicBoundsC{C:c}} mem)
+	for {
+		kind := auxIntToInt64(v.AuxInt)
+		hi := v_0
+		lo := v_1
+		if v_2.Op != OpRISCV64MOVDconst {
+			break
+		}
+		c := auxIntToInt64(v_2.AuxInt)
+		mem := v_3
+		v.reset(OpRISCV64LoweredPanicExtendRC)
+		v.AuxInt = int64ToAuxInt(kind)
+		v.Aux = panicBoundsCToAux(PanicBoundsC{C: c})
+		v.AddArg3(hi, lo, mem)
+		return true
+	}
+	// match: (LoweredPanicExtendRR [kind] (MOVDconst [hi]) (MOVDconst [lo]) y mem)
+	// result: (LoweredPanicBoundsCR [kind] {PanicBoundsC{C:hi<<32 + int64(uint32(lo))}} y mem)
+	for {
+		kind := auxIntToInt64(v.AuxInt)
+		if v_0.Op != OpRISCV64MOVDconst {
+			break
+		}
+		hi := auxIntToInt64(v_0.AuxInt)
+		if v_1.Op != OpRISCV64MOVDconst {
+			break
+		}
+		lo := auxIntToInt64(v_1.AuxInt)
+		y := v_2
+		mem := v_3
+		v.reset(OpRISCV64LoweredPanicBoundsCR)
+		v.AuxInt = int64ToAuxInt(kind)
+		v.Aux = panicBoundsCToAux(PanicBoundsC{C: hi<<32 + int64(uint32(lo))})
 		v.AddArg2(y, mem)
 		return true
 	}

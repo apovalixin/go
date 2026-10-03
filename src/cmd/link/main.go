@@ -62,6 +62,8 @@ func main() {
 		arch, theArch = mips64.Init()
 	case "ppc64", "ppc64le":
 		arch, theArch = ppc64.Init()
+	case "riscv":
+		arch, theArch = riscv64.InitRV32()
 	case "riscv64":
 		arch, theArch = riscv64.Init()
 	case "s390x":

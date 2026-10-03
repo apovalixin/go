@@ -6137,6 +6137,8 @@ const (
 	OpRISCV64LoweredPanicBoundsRC
 	OpRISCV64LoweredPanicBoundsCR
 	OpRISCV64LoweredPanicBoundsCC
+	OpRISCV64LoweredPanicExtendRR
+	OpRISCV64LoweredPanicExtendRC
 	OpRISCV64FADDS
 	OpRISCV64FSUBS
 	OpRISCV64FMULS
@@ -96408,6 +96410,31 @@ var opcodeTable = [...]opInfo{
 		argLen:  1,
 		call:    true,
 		reg:     regInfo{},
+	},
+	{
+		name:    "LoweredPanicExtendRR",
+		auxType: auxInt64,
+		argLen:  4,
+		call:    true,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{0, regMask{v1: 240, v2: 0}},     // X5 X6 X7 X8
+				{1, regMask{v1: 240, v2: 0}},     // X5 X6 X7 X8
+				{2, regMask{v1: 1048560, v2: 0}}, // X5 X6 X7 X8 X9 X10 X11 X12 X13 X14 X15 X16 X17 X18 X19 X20
+			},
+		},
+	},
+	{
+		name:    "LoweredPanicExtendRC",
+		auxType: auxPanicBoundsC,
+		argLen:  3,
+		call:    true,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{0, regMask{v1: 240, v2: 0}}, // X5 X6 X7 X8
+				{1, regMask{v1: 240, v2: 0}}, // X5 X6 X7 X8
+			},
+		},
 	},
 	{
 		name:        "FADDS",

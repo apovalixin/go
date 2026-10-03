@@ -240,6 +240,7 @@ var gcArchSizes = map[string]*gcSizes{
 	"mips64le": {8, 8},
 	"ppc64":    {8, 8},
 	"ppc64le":  {8, 8},
+	"riscv":    {4, 4},
 	"riscv64":  {8, 8},
 	"s390x":    {8, 8},
 	"sparc64":  {8, 8},

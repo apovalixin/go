@@ -524,6 +524,44 @@ func ssaGenValue(s *ssagen.State, v *ssa.Value) {
 		// AuxInt encodes how many buffer entries we need.
 		p.To.Sym = ir.Syms.GCWriteBarrier[v.AuxInt-1]
 
+	case ssa.OpRISCV64LoweredPanicExtendRR, ssa.OpRISCV64LoweredPanicExtendRC:
+		// GOARCH=riscv only: the x value is 64 bits, in two registers.
+		code, signed := ssa.BoundsKind(v.AuxInt).Code()
+		hi := int(v.Args[0].Reg() - riscv.REG_X5)
+		lo := int(v.Args[1].Reg() - riscv.REG_X5)
+		xVal := hi<<2 + lo // encode 2 register numbers
+		yIsReg := false
+		yVal := 0
+		if v.Op == ssa.OpRISCV64LoweredPanicExtendRR {
+			yIsReg = true
+			yVal = int(v.Args[2].Reg() - riscv.REG_X5)
+		} else {
+			c := v.Aux.(ssa.PanicBoundsC).C
+			if c >= 0 && c <= abi.BoundsMaxConst {
+				yVal = int(c)
+			} else {
+				// Move constant to a register
+				yIsReg = true
+				for yVal == hi || yVal == lo {
+					yVal++
+				}
+				p := s.Prog(riscv.AMOV)
+				p.From.Type = obj.TYPE_CONST
+				p.From.Offset = c
+				p.To.Type = obj.TYPE_REG
+				p.To.Reg = riscv.REG_X5 + int16(yVal)
+			}
+		}
+		c := abi.BoundsEncode(code, signed, true, yIsReg, xVal, yVal)
+
+		p := s.Prog(obj.APCDATA)
+		p.From.SetConst(abi.PCDATA_PanicBounds)
+		p.To.SetConst(int64(c))
+		p = s.Prog(obj.ACALL)
+		p.To.Type = obj.TYPE_MEM
+		p.To.Name = obj.NAME_EXTERN
+		p.To.Sym = ir.Syms.PanicExtend
+
 	case ssa.OpRISCV64LoweredPanicBoundsRR, ssa.OpRISCV64LoweredPanicBoundsRC, ssa.OpRISCV64LoweredPanicBoundsCR, ssa.OpRISCV64LoweredPanicBoundsCC:
 		// Compute the constant we put in the PCData entry for this call.
 		code, signed := ssa.BoundsKind(v.AuxInt).Code()
@@ -531,6 +569,7 @@ func ssaGenValue(s *ssagen.State, v *ssa.Value) {
 		yIsReg := false
 		xVal := 0
 		yVal := 0
+		extend := false
 		switch v.Op {
 		case ssa.OpRISCV64LoweredPanicBoundsRR:
 			xIsReg = true
@@ -561,6 +600,28 @@ func ssaGenValue(s *ssagen.State, v *ssa.Value) {
 			c := v.Aux.(ssa.PanicBoundsC).C
 			if c >= 0 && c <= abi.BoundsMaxConst {
 				xVal = int(c)
+			} else if base.Ctxt.Arch.RegSize == 4 && !(signed && int64(int32(c)) == c || !signed && int64(uint32(c)) == c) {
+				// Move constant to two registers
+				extend = true
+				xIsReg = true
+				hi, lo := 0, 1
+				if hi == yVal {
+					hi = 2
+				}
+				if lo == yVal {
+					lo = 2
+				}
+				xVal = hi<<2 + lo
+				p := s.Prog(riscv.AMOV)
+				p.From.Type = obj.TYPE_CONST
+				p.From.Offset = c >> 32
+				p.To.Type = obj.TYPE_REG
+				p.To.Reg = riscv.REG_X5 + int16(hi)
+				p = s.Prog(riscv.AMOV)
+				p.From.Type = obj.TYPE_CONST
+				p.From.Offset = int64(int32(c))
+				p.To.Type = obj.TYPE_REG
+				p.To.Reg = riscv.REG_X5 + int16(lo)
 			} else {
 				// Move constant to a register
 				if xVal == yVal {
@@ -576,6 +637,22 @@ func ssaGenValue(s *ssagen.State, v *ssa.Value) {
 			c := v.Aux.(ssa.PanicBoundsCC).Cx
 			if c >= 0 && c <= abi.BoundsMaxConst {
 				xVal = int(c)
+			} else if base.Ctxt.Arch.RegSize == 4 && !(signed && int64(int32(c)) == c || !signed && int64(uint32(c)) == c) {
+				// Move constant to two registers
+				extend = true
+				xIsReg = true
+				hi, lo := 0, 1
+				xVal = hi<<2 + lo
+				p := s.Prog(riscv.AMOV)
+				p.From.Type = obj.TYPE_CONST
+				p.From.Offset = c >> 32
+				p.To.Type = obj.TYPE_REG
+				p.To.Reg = riscv.REG_X5 + int16(hi)
+				p = s.Prog(riscv.AMOV)
+				p.From.Type = obj.TYPE_CONST
+				p.From.Offset = int64(int32(c))
+				p.To.Type = obj.TYPE_REG
+				p.To.Reg = riscv.REG_X5 + int16(lo)
 			} else {
 				// Move constant to a register
 				xIsReg = true
@@ -592,6 +669,9 @@ func ssaGenValue(s *ssagen.State, v *ssa.Value) {
 				// Move constant to a register
 				yIsReg = true
 				yVal = 1
+				if extend {
+					yVal = 2
+				}
 				p := s.Prog(riscv.AMOV)
 				p.From.Type = obj.TYPE_CONST
 				p.From.Offset = c
@@ -607,7 +687,11 @@ func ssaGenValue(s *ssagen.State, v *ssa.Value) {
 		p = s.Prog(obj.ACALL)
 		p.To.Type = obj.TYPE_MEM
 		p.To.Name = obj.NAME_EXTERN
-		p.To.Sym = ir.Syms.PanicBounds
+		if extend {
+			p.To.Sym = ir.Syms.PanicExtend
+		} else {
+			p.To.Sym = ir.Syms.PanicBounds
+		}
 
 	case ssa.OpRISCV64LoweredAtomicLoad8:
 		p1 := s.Prog(riscv.AFENCE)

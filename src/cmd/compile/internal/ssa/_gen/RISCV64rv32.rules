@@ -98,7 +98,9 @@
 (Lsh(32|16|8)x32 <t> x y) && !shiftIsBounded(v) => (AND (SLL <t> x y) (NEG <t> (SLTIU <t> [32] y)))
 (Lsh(32|16|8)x16 <t> x y) && !shiftIsBounded(v) => (AND (SLL <t> x y) (NEG <t> (SLTIU <t> [32] (ZeroExt16to32 y))))
 (Lsh(32|16|8)x8 <t> x y) && !shiftIsBounded(v) => (AND (SLL <t> x y) (NEG <t> (SLTIU <t> [32] (ZeroExt8to32 y))))
-(Lsh(32|16|8)x(32|16|8) x y) && shiftIsBounded(v) => (SLL x y)
+(Lsh32x(32|16|8) x y) && shiftIsBounded(v) => (SLL x y)
+(Lsh16x(32|16|8) x y) && shiftIsBounded(v) => (SLL x y)
+(Lsh8x(32|16|8) x y) && shiftIsBounded(v) => (SLL x y)
 
 (Rsh32Ux32 <t> x y) && !shiftIsBounded(v) => (AND (SRL <t> x y) (NEG <t> (SLTIU <t> [32] y)))
 (Rsh32Ux16 <t> x y) && !shiftIsBounded(v) => (AND (SRL <t> x y) (NEG <t> (SLTIU <t> [32] (ZeroExt16to32 y))))
@@ -283,6 +285,11 @@
 (LoweredPanicBoundsRR [kind] (MOVDconst [c]) y mem) => (LoweredPanicBoundsCR [kind] {PanicBoundsC{C:c}} y mem)
 (LoweredPanicBoundsRC [kind] {p} (MOVDconst [c]) mem) => (LoweredPanicBoundsCC [kind] {PanicBoundsCC{Cx:c, Cy:p.C}} mem)
 (LoweredPanicBoundsCR [kind] {p} (MOVDconst [c]) mem) => (LoweredPanicBoundsCC [kind] {PanicBoundsCC{Cx:p.C, Cy:c}} mem)
+
+(PanicExtend ...) => (LoweredPanicExtendRR ...)
+(LoweredPanicExtendRR [kind] hi lo (MOVDconst [c]) mem) => (LoweredPanicExtendRC [kind] hi lo {PanicBoundsC{C:c}} mem)
+(LoweredPanicExtendRR [kind] (MOVDconst [hi]) (MOVDconst [lo]) y mem) => (LoweredPanicBoundsCR [kind] {PanicBoundsC{C:hi<<32 + int64(uint32(lo))}} y mem)
+(LoweredPanicExtendRC [kind] {p} (MOVDconst [hi]) (MOVDconst [lo]) mem) => (LoweredPanicBoundsCC [kind] {PanicBoundsCC{Cx:hi<<32 + int64(uint32(lo)), Cy:p.C}} mem)
 
 // Conditional branches
 (If cond yes no) => (BNEZ (MOVBUreg <typ.UInt32> cond) yes no)

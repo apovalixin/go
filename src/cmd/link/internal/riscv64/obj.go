@@ -56,9 +56,17 @@ func Init() (*sys.Arch, ld.Arch) {
 	return arch, theArch
 }
 
+// InitRV32 sets up the linker for 32-bit RISC-V (GOARCH=riscv).
+func InitRV32() (*sys.Arch, ld.Arch) {
+	_, theArch := Init()
+	theArch.ELF.Netbsddynld = "/libexec/ld.elf_so"
+	theArch.ELF.RelocSize = 12
+	return sys.ArchRISCV, theArch
+}
+
 func archinit(ctxt *ld.Link) {
 	switch ctxt.HeadType {
-	case objabi.Hlinux, objabi.Hfreebsd, objabi.Hopenbsd:
+	case objabi.Hlinux, objabi.Hfreebsd, objabi.Hopenbsd, objabi.Hnetbsd:
 		ld.Elfinit(ctxt)
 		ld.HEADR = ld.ELFRESERVE
 		if *ld.FlagRound == -1 {

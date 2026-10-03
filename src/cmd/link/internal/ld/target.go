@@ -121,7 +121,9 @@ func (t *Target) IsPPC64() bool {
 }
 
 func (t *Target) IsRISCV64() bool {
-	return t.Arch.Family == sys.RISCV64
+	// 32-bit RISC-V is linked the same way: the relocations and the
+	// trampolines do not depend on the register width.
+	return t.Arch.Family == sys.RISCV64 || t.Arch.Family == sys.RISCV
 }
 
 func (t *Target) IsS390X() bool {
